@@ -1,0 +1,5 @@
+docs/_book
+demo*/
+test/
+node_modules/
+.idea/

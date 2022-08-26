@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Clipboard</title>
+
+    <style>
+        .clipboardTable {
+            width: 100%;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .clipboardTable td {
+            height: auto;
+            border: none;
+            border-bottom: solid 1px #ddd;
+        }
+
+        td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+
+            /*取消双击选中*/
+            user-select: none;
+        }
+
+        .tgDiv {
+            display: -webkit-flex;
+            display: flex;
+            -webkit-align-items: center;
+            align-items: center;
+            -webkit-justify-content: center;
+
+            flex-flow: row nowrap;
+            justify-content: space-between;
+            align-content: flex-start;
+        }
+
+        .tgDiv span {
+            color: #888888;
+            padding-right: 5px;
+        }
+        .tgDiv img {
+            padding-left: 5px;
+        }
+
+        .tgDiv pre {
+            /*min-height: 40px;*/
+            max-height: 140px;
+            font-family: '微软雅黑';
+            float: left;
+            padding-left: 5px;
+        }
+
+        img {
+            max-width: 765px;
+            _width: expression(this.width > 765 ? "300px" : this.width);
+            max-height: 200px;
+            _height: expression(this.height > 200 ? "200px" : this.height);
+        }
+    </style>
+</head>
+<body>
+
+<table id="table1" class="clipboardTable">
+    <tbody>
+    <!--    <tr>-->
+    <!--        <td>xx</td>-->
+    <!--    </tr>-->
+    </tbody>
+
+</table>
+
+</body>
+<script type="module">
+    const {clipboard, nativeImage} = require('electron')
+    let tbody = document.querySelector("tbody")
+    let arrList = []
+
+    let trs = document.getElementById('table1').getElementsByTagName('tr');
+
+    function checkRow() {
+        for (let i = 0; i < trs.length; i++) {
+            trs[i].onmousedown = function () {
+                onmousedown(this);
+            }
+            trs[i].querySelector("span").innerHTML = (i + 1).toString()
+        }
+    }
+
+
+    function onmousedown(obj) {
+        for (let idx = 0; idx < trs.length; idx++) {
+            if (trs[idx] === obj) {
+                obj.style.backgroundColor = '#eef4fa';
+                let child = obj.getElementsByTagName("td")[0]
+                choiceLine(child, true)
+            } else {
+                trs[idx].style.backgroundColor = '';
+                let child = trs[idx].getElementsByTagName("td")[0]
+                choiceLine(child, false)
+            }
+        }
+    }
+
+    function choiceLine(child, flag) {
+        let width, style, color;
+        if (flag) {
+            width = '2px'
+            style = 'solid'
+            color = '#3f54af'
+        } else {
+            width = ''
+            style = ''
+            color = ''
+        }
+        child.style.borderLeftWidth = width;
+        child.style.borderLeftStyle = style;
+        child.style.borderLeftColor = color;
+
+        child.style.borderRightWidth = width;
+        child.style.borderRightStyle = style;
+        child.style.borderRightColor = color;
+
+        child.style.borderTopWidth = width;
+        child.style.borderTopStyle = style;
+        child.style.borderTopColor = color;
+
+        child.style.borderBottomWidth = width;
+        child.style.borderBottomStyle = style;
+        child.style.borderBottomColor = color;
+    }
+
+    // 双击复制到剪贴板
+    function dbClick() {
+        if (this.cells[0].childNodes[0].textContent.length !== 0) {
+            clipboard.writeText(this.cells[0].querySelector("#preTag").textContent)
+            return
+        }
+
+        if (this.cells[0].querySelector("#img01").src.length !== 0) {
+            let image = nativeImage.createFromDataURL(this.cells[0].querySelector("#img01").src)
+            clipboard.writeImage(image)
+        }
+    }
+
+    let timer = setInterval(() => {
+        let data = clipboard.readText()
+        let flag = false;
+        let idx = 0;
+
+        if (data.length === 0) {
+            let img = clipboard.readImage()
+            if (!img.isEmpty()) {
+                for (idx in arrList) {
+                    if (arrList[idx] === img.toDataURL()) {
+                        flag = true
+                        break
+                    }
+                }
+
+                let tg = `<div class="tgDiv"><img id="img01" src="` + img.toDataURL() + `" alt={}/> <span></span></div>`
+                if (!flag) {
+                    insertRow(img.toDataURL(), tg)
+                } else {
+                    if (idx > 0) {
+                        switchRow(idx, img.toDataURL(), tg)
+                    } else {
+                        return
+                    }
+                }
+            }
+        } else {
+            for (idx in arrList) {
+                if (arrList[idx] === data) {
+                    flag = true
+                    break
+                }
+            }
+
+            let tg = `<div class="tgDiv"><pre id="preTag">` + data + `</pre> <span></span></div>`
+            // 不存在则写入剪贴板
+            if (!flag) {
+                insertRow(data, tg)
+            } else {
+                if (idx > 0) {
+                    switchRow(idx, data, tg)
+                } else {
+                    return
+                }
+            }
+        }
+        checkRow()
+    }, 2000)
+
+    function insertRow(cliData, tgData) {
+        let tr = tbody.insertRow(0)
+        tr.ondblclick = dbClick
+        tr.insertCell(0).innerHTML = tgData
+        arrList.unshift(cliData)
+    }
+
+    function switchRow(idx, cliData, tgData) {
+        // 删除旧的
+        arrList.splice(idx, 1)
+        tbody.deleteRow(idx)
+
+        // 存在则将其放在首位
+        arrList.unshift(cliData)
+        let tr = tbody.insertRow(0)
+        tr.ondblclick = dbClick
+        tr.insertCell(0).innerHTML = tgData
+    }
+
+</script>
+
+
+</html>
